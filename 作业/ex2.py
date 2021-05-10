@@ -6,7 +6,7 @@ import random
 model = polynomial_model()
 # 读取MNIST数据
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
 # 获得数据集相关参数
 train_num = mnist.train.num_examples
 validation_num = mnist.validation.num_examples
