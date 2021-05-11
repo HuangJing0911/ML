@@ -1,9 +1,9 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from ex1 import polynomial_model
+# from ex1 import polynomial_model
 import random
 
-model = polynomial_model()
+# model = polynomial_model()
 # 读取MNIST数据
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data/', one_hot=True)
@@ -27,6 +27,7 @@ print('>>>训练集数据大小：',train_data.shape,'\n',
 train_labels = mnist.train.labels     #(55000,10)
 val_labels = mnist.validation.labels  #(5000,10)
 test_labels = mnist.test.labels       #(10000,10)
+print(type(test_labels))
 
 # 训练并打印图像
 plt.figure()

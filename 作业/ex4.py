@@ -4,7 +4,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import time
 from sklearn.metrics import roc_curve, auc
 from sklearn.multiclass import OneVsRestClassifier 
-
+import matplotlib.pyplot as plt
 
 # ex4_1:多项逻辑斯蒂回归的编程实现
 mnist=input_data.read_data_sets('MNIST_data/',one_hot=True)
@@ -35,32 +35,51 @@ with tf.Session() as sess:
     sess.run(init)
     n_batches=int(mnist.train.num_examples/batch_size)
 
+    # 训练模型
     for i in range(n_epochs):
-
         total_loss=0
-
         for _ in range(n_batches):
             X_batch, Y_batch =mnist.train.next_batch(batch_size)
             _,loss_batch =sess.run([optimizer,loss],feed_dict={X:X_batch,Y:Y_batch})
             total_loss +=loss_batch
         print ('Average loss epoch {0}:{1}'.format(i,total_loss/n_batches))
     print ('Total time: {0} seconds'.format(time.time()-start_time))
-
     print ('optimizatin Finished')
 
 
-    preds = tf.nn.softmax(logits)
-    correct_preds=tf.equal(tf.argmax(preds,1),tf.argmax(Y,1))
-    accuracy=tf.reduce_sum(tf.cast(correct_preds,tf.float32))
+    preds = tf.nn.softmax(logits)                               # 得到每张图片对每个数字种类预测的概率
+    correct_preds=tf.equal(tf.argmax(preds,1),tf.argmax(Y,1))   # 找到预测值preds和Y的每一行最大的下标并逐个判断
+    accuracy=tf.reduce_sum(tf.cast(correct_preds,tf.float32))   # 数据类型转换并对预测值偏差求和
+    y_score = []
 
     n_batches = int(mnist.test.num_examples/batch_size)
     total_correct_preds=0
 
+    # 验证模型
     for i in range(n_batches):
         X_batch, Y_batch=mnist.test.next_batch(batch_size)
-        accuracy_batch =sess.run([accuracy],feed_dict={X:X_batch,Y:Y_batch})
-        total_correct_preds += accuracy_batch[0]
+        preds_batch = sess.run([preds],feed_dict={X:X_batch,Y:Y_batch})
+        y_score.append(preds_batch)
+        # total_correct_preds += accuracy_batch[0]       
 
-    print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
-
+    # print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
     writer.close()
+
+# 绘制ROC图像
+with tf.Session() as sess:
+    # Y = sess.run([],feed_dict={})
+    fpr,tpr,threshold = roc_curve(y_score, mnist.test.labels)
+    roc_auc = auc(fpr, tpr)
+    plt.figure()
+    lw = 2
+    plt.figure(figsize=(10,10))
+    plt.plot(fpr, tpr, color='darkorange',
+            lw=lw, label='ROC curve (area = %0.2f)' % roc_auc) ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic example')
+    plt.legend(loc="lower right")
+    plt.show()
