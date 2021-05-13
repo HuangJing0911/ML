@@ -159,3 +159,6 @@ def normal_logistic():
 
 # ex4_1_2:使用l1正则化的logistic回归
 def regularize_logistic():
+
+    w = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
+    b = tf.Variable(tf.zeros([1,10]),name='bias')
