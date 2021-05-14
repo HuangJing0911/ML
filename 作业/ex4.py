@@ -1,5 +1,6 @@
 import imp
 import numpy as np
+from sklearn.utils.extmath import log_logistic
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import time
@@ -130,16 +131,18 @@ def normal_logistic():
         for i in range(n_batches):
             X_batch, Y_batch=mnist.test.next_batch(batch_size)
             preds_batch = sess.run([preds],feed_dict={X:X_batch,Y:Y_batch})
+            accuracy_batch = sess.run([accuracy],feed_dict={X:X_batch,Y:Y_batch})
             # print(i,np.array(preds_batch[0]).shape)
             y_score.append(np.array(preds_batch[0]).tolist())
-            # total_correct_preds += accuracy_batch[0]       
+            total_correct_preds += accuracy_batch[0]       
 
-        # print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
+        print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
         writer.close()
         # print(y_score)  # <class 'numpy.ndarray'>
         y_score = np.array(y_score)
         y_score = y_score.reshape((n_batches*batch_size, 10))
         print("len of y_score is:(",len(y_score),len(y_score[0]),")")
+
 
     # 绘制ROC图像 
     with tf.Session() as sess:
@@ -160,5 +163,178 @@ def normal_logistic():
 # ex4_1_2:使用l1正则化的logistic回归
 def regularize_logistic():
 
-    w = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
+    # 设置正则化权重
+    lamda = 0.03
+    weight = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
+    regular = tf.multiply(tf.nn.l2_loss(weight), lamda, name="regualar")
+    tf.add_to_collection("losses", regular)
     b = tf.Variable(tf.zeros([1,10]),name='bias')
+
+    # 设置loss
+    logits=tf.matmul(X,weight)+b
+    entropy=tf.nn.softmax_cross_entropy_with_logits(logits=logits,labels=Y,name='loss')
+    mse_loss=tf.reduce_mean(entropy)
+    tf.add_to_collection("losses", mse_loss)
+    loss = tf.add_n(tf.get_collection("losses"))
+
+    learning_rate=0.01
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+
+    n_epochs = 30
+    init=tf.global_variables_initializer()
+    with tf.Session() as sess:
+        writer=tf.summary.FileWriter('./graphs/logistic_regular_reg',sess.graph)
+
+        start_time=time.time()
+        sess.run(init)
+        n_batches=int(mnist.train.num_examples/batch_size)
+
+        # 训练模型
+        for i in range(n_epochs):
+            total_loss=0
+            for _ in range(n_batches):
+                X_batch, Y_batch =mnist.train.next_batch(batch_size)
+                _,loss_batch =sess.run([optimizer,loss],feed_dict={X:X_batch,Y:Y_batch})
+                total_loss +=loss_batch
+            print ('Average loss epoch {0}:{1}'.format(i,total_loss/n_batches))
+        print ('Total time: {0} seconds'.format(time.time()-start_time))
+        print ('optimizatin Finished')
+
+
+        preds = tf.nn.softmax(logits)                               # 得到每张图片对每个数字种类预测的概率
+        correct_preds=tf.equal(tf.argmax(preds,1),tf.argmax(Y,1))   # 找到预测值preds和Y的每一行最大的索引并逐个判断
+        accuracy=tf.reduce_sum(tf.cast(correct_preds,tf.float32))   # 数据类型转换并对预测值偏差求和
+        y_score = [] # list
+
+        n_batches = int(mnist.test.num_examples/batch_size)
+        total_correct_preds=0
+
+        # 验证模型
+        for i in range(n_batches):
+            X_batch, Y_batch=mnist.test.next_batch(batch_size)
+            preds_batch = sess.run([preds],feed_dict={X:X_batch,Y:Y_batch})
+            accuracy_batch = sess.run([accuracy],feed_dict={X:X_batch,Y:Y_batch})
+            # print(i,np.array(preds_batch[0]).shape)
+            y_score.append(np.array(preds_batch[0]).tolist())
+            total_correct_preds += accuracy_batch[0]       
+
+        print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
+        writer.close()
+        # print(y_score)  # <class 'numpy.ndarray'>
+        y_score = np.array(y_score)
+        y_score = y_score.reshape((n_batches*batch_size, 10))
+        print("len of y_score is:(",len(y_score),len(y_score[0]),")")
+
+        writer.close()
+
+    # 绘制ROC图像 
+    with tf.Session() as sess:
+        # 对测试数据结果进行转换
+        Y_pred = tf.arg_max(y_score,1)                          # 取出预测值中元素最大值所对应的索引
+        Y_valid = tf.arg_max(mnist.test.labels, 1)              # 取出Y中元素最大值对应的索引
+        Y1, Y2 = sess.run([Y_pred,Y_valid])
+        Y_pred = np.array(Y1)
+        Y2 = Y2[0:n_batches*batch_size]
+        Y_valid = np.array(Y2)
+        print(Y1.shape,Y2.shape)
+        # 对数据进行二值化
+        class_of_mnist = [i for i in range(10)]
+        Y_pred = label_binarize(Y_pred, classes = class_of_mnist)
+        Y_valid = label_binarize(Y_valid, classes = class_of_mnist)
+        plot_roc(Y_valid, Y_pred, 10, "./images/ROC/ROC_10分类_正则化.png")    # 具体绘制图片
+    
+
+# ex4_1_3:添加噪声和正则化的logistic回归
+def regularize_logistic_withnoise():
+
+    # 设置正则化权重
+    # lamda = 0.03
+    weight = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
+    # regular = tf.multiply(tf.nn.l2_loss(weight), lamda, name="regualar")
+    # tf.add_to_collection("losses", regular)
+    b = tf.Variable(tf.zeros([1,10]),name='bias')
+
+    # 设置loss
+    logits=tf.matmul(X,weight)+b
+    entropy=tf.nn.softmax_cross_entropy_with_logits(logits=logits,labels=Y,name='loss')
+    mse_loss=tf.reduce_mean(entropy)
+    tf.add_to_collection("losses", mse_loss)
+    loss = tf.add_n(tf.get_collection("losses"))
+
+    learning_rate=0.01
+
+    # 求偏导数并加上噪声
+    W_grad, b_grad=tf.gradients(loss, [weight,b])
+    noise = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.0001), name='noises')
+    new_W = weight.assign(weight - learning_rate * W_grad + noise)
+    new_b = b.assign(b - learning_rate * b_grad)
+
+
+    n_epochs = 30
+    init=tf.global_variables_initializer()
+    with tf.Session() as sess:
+        writer=tf.summary.FileWriter('./graphs/logistic_regular_reg_withnoise',sess.graph)
+
+        start_time=time.time()
+        sess.run(init)
+        n_batches=int(mnist.train.num_examples/batch_size)
+
+        # 训练模型
+        for i in range(n_epochs):
+            total_loss=0
+            for _ in range(n_batches):
+                X_batch, Y_batch =mnist.train.next_batch(batch_size)
+                _,_,loss_batch =sess.run([new_W, new_b, loss],feed_dict={X:X_batch,Y:Y_batch})
+                total_loss +=loss_batch
+            print ('Average loss epoch {0}:{1}'.format(i,total_loss/n_batches))
+        print ('Total time: {0} seconds'.format(time.time()-start_time))
+        print ('optimizatin Finished')
+
+
+        preds = tf.nn.softmax(logits)                               # 得到每张图片对每个数字种类预测的概率
+        correct_preds=tf.equal(tf.argmax(preds,1),tf.argmax(Y,1))   # 找到预测值preds和Y的每一行最大的索引并逐个判断
+        accuracy=tf.reduce_sum(tf.cast(correct_preds,tf.float32))   # 数据类型转换并对预测值偏差求和
+        y_score = [] # list
+
+        n_batches = int(mnist.test.num_examples/batch_size)
+        total_correct_preds=0
+
+        # 验证模型
+        for i in range(n_batches):
+            X_batch, Y_batch=mnist.test.next_batch(batch_size)
+            preds_batch = sess.run([preds],feed_dict={X:X_batch,Y:Y_batch})
+            accuracy_batch = sess.run([accuracy],feed_dict={X:X_batch,Y:Y_batch})
+            # print(i,np.array(preds_batch[0]).shape)
+            y_score.append(np.array(preds_batch[0]).tolist())
+            total_correct_preds += accuracy_batch[0]       
+
+        print ('Accuracy {0}'.format(total_correct_preds/mnist.test.num_examples))
+        writer.close()
+        # print(y_score)  # <class 'numpy.ndarray'>
+        y_score = np.array(y_score)
+        y_score = y_score.reshape((n_batches*batch_size, 10))
+        print("len of y_score is:(",len(y_score),len(y_score[0]),")")
+
+        writer.close()
+
+    # 绘制ROC图像 
+    with tf.Session() as sess:
+        # 对测试数据结果进行转换
+        Y_pred = tf.arg_max(y_score,1)                          # 取出预测值中元素最大值所对应的索引
+        Y_valid = tf.arg_max(mnist.test.labels, 1)              # 取出Y中元素最大值对应的索引
+        Y1, Y2 = sess.run([Y_pred,Y_valid])
+        Y_pred = np.array(Y1)
+        Y2 = Y2[0:n_batches*batch_size]
+        Y_valid = np.array(Y2)
+        print(Y1.shape,Y2.shape)
+        # 对数据进行二值化
+        class_of_mnist = [i for i in range(10)]
+        Y_pred = label_binarize(Y_pred, classes = class_of_mnist)
+        Y_valid = label_binarize(Y_valid, classes = class_of_mnist)
+        plot_roc(Y_valid, Y_pred, 10, "./images/ROC/ROC_10分类_正则化_withnoise.png")    # 具体绘制图片
+
+
+# 测试程序
+# normal_logistic()
+# regularize_logistic()
+regularize_logistic_withnoise()
