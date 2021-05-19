@@ -91,14 +91,13 @@ def normal_logistic():
 
     # W*x+b
     logits=tf.matmul(X,w)+b
-    tf.nn.weighted_cross_entropy_with_logits
     entropy=tf.nn.softmax_cross_entropy_with_logits(logits=logits,labels=Y,name='loss')
     loss=tf.reduce_mean(entropy)
 
-    learning_rate=0.01
+    learning_rate = 0.05
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
 
-    n_epochs = 30
+    n_epochs = 50
     init=tf.global_variables_initializer()
     with tf.Session() as sess:
         writer=tf.summary.FileWriter('./graphs/logistic_reg',sess.graph)
@@ -177,10 +176,10 @@ def regularize_logistic():
     tf.add_to_collection("losses", mse_loss)
     loss = tf.add_n(tf.get_collection("losses"))
 
-    learning_rate=0.01
+    learning_rate=0.05
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
 
-    n_epochs = 30
+    n_epochs = 50
     init=tf.global_variables_initializer()
     with tf.Session() as sess:
         writer=tf.summary.FileWriter('./graphs/logistic_regular_reg',sess.graph)
@@ -248,10 +247,7 @@ def regularize_logistic():
 def regularize_logistic_withnoise():
 
     # 设置正则化权重
-    # lamda = 0.03
     weight = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
-    # regular = tf.multiply(tf.nn.l2_loss(weight), lamda, name="regualar")
-    # tf.add_to_collection("losses", regular)
     b = tf.Variable(tf.zeros([1,10]),name='bias')
 
     # 设置loss
@@ -332,6 +328,35 @@ def regularize_logistic_withnoise():
         Y_pred = label_binarize(Y_pred, classes = class_of_mnist)
         Y_valid = label_binarize(Y_valid, classes = class_of_mnist)
         plot_roc(Y_valid, Y_pred, 10, "./images/ROC/ROC_10分类_正则化_withnoise.png")    # 具体绘制图片
+
+
+
+# ex4_2:体会不同损失函数对实验结果的影响
+def loss_for_softmax():
+    # Training Parameters
+    learning_rate = 0.001
+    num_steps = 100
+    batch_size = 20
+
+    # Network Parameters
+    num_input = 784 # MNIST data input (img shape: 28*28)
+    num_classes = 10 # MNIST total classes (0-9 digits)
+    dropout = 0.75 # Dropout, probability to keep units
+
+    # 设置正则化权重
+    # lamda = 0.03
+    weight = tf.Variable(tf.random_normal(shape=[784,10],stddev=0.01),name='weights')
+    # regular = tf.multiply(tf.nn.l2_loss(weight), lamda, name="regualar")
+    # tf.add_to_collection("losses", regular)
+    b = tf.Variable(tf.zeros([1,10]),name='bias')
+
+    # 设置loss
+    logits=tf.matmul(X,weight)+b
+    entropy=tf.nn.softmax_cross_entropy_with_logits(logits=logits,labels=Y,name='loss')
+    entropy=tf.nn.log_softmax(logits)
+    mse_loss=tf.reduce_mean(entropy)
+    tf.add_to_collection("losses", mse_loss)
+    loss = tf.add_n(tf.get_collection("losses"))
 
 
 # 测试程序
